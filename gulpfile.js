@@ -20,11 +20,7 @@ var QMLParserSources = [
   'src/qtcore/qml/lib/process.js',
   'src/qtcore/qml/lib/import.js',
 
-  'src/qtcore/qrc.js',
-  'src/qtcore/qt.js',
-  'src/qtcore/signal.js',
-  'src/qtcore/font.js',
-  'src/qtcore/easing.js',
+  'src/qtcore/*.js',
   'src/qtcore/qml/qml.js',
   'src/qtcore/qml/**/*.js',
 
