@@ -1,0 +1,12 @@
+<script src="/build/qml2js-all.js"></script>
+<script src="/tests/initPage.js"></script>
+<script>
+	
+	requireQML("/tests/base/Div.qml", function(con) {
+			var qmlinstance = con();
+			qmlinstance.onState(QML.states.BuildedComponent, function() {
+		debugger
+				qmlinstance.appendTo(document.body);
+			});
+		})
+</script>

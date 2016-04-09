@@ -1,6 +1,8 @@
 /*
  * 更好的压缩率
  */
+var __PROTOTYPE = "prototype";
+
 function $Push(arr, item) {
 	arr[arr.length] = item;
 	return arr
@@ -19,8 +21,19 @@ function $Map(arr, cb) {
 	return res
 }
 
+var _slice = Array[__PROTOTYPE].slice;
+
 function $Slice(arr, start_index, end_index) {
-	return arr.slice(start_index, end_index)
+	return _slice.call(arr, start_index, end_index);
+};
+
+function $Remove(arr, item) {
+	var index = arr.indexOf(item);
+	index !== -1 && arr.splice(i, 1);
+};
+
+function $HasAndGet(obj, key) {
+	return obj.hasOwnProperty(key) && obj[key];
 };
 
 //将字符串反转义,同JSON.stringify(string)

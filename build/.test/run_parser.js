@@ -14,16 +14,22 @@ try {
 				),
 				null,
 				3
-			)/*,
-			void 0*/
+			),
+			void 0
 		)
 	);
 
-	// console.log(QMLTreeToJS(tree).code)
+	// console.log(QMLTreeToJS(tree))
+	var qmlparse_res = QMLTreeToJS(tree);
+	var code;
+	console.log(code = beautify(qmlparse_res.code.replace(/([\,\]])/g, "$1\n"), {
+		comma_first: true
+	}));
 
-	console.log(beautify(QMLTreeToJS(tree).code.replace(/([\,\]])/g, "$1\n"),{
-		comma_first:true
-	}))
+	var fun = Function(qmlparse_res.params, "return function(){return " + code + "}")(qmlparse_res.args);
+	fun(function (qmlinstance) {
+		console.log(qmlinstance)
+	})
 } catch (e) {
 	console.error(e.toString === Error.prototype.toString ? e.stack : e.toString())
 }

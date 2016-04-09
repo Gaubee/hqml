@@ -197,5 +197,5 @@ QMLTreeToJSBuilder[_FUNCTION] = function(node, args_info, param_prefix) {
 		return strStringify(argName)
 	});
 
-	return "$.function(" + functionName + ",[" + argsDefine.join() + "])"
+	return "$.function(" + functionName + ",[" + argsDefine.join() + "," + ArrayQMLTreeToJSBuilder(node[3]) + "])"
 };

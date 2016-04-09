@@ -63,8 +63,15 @@ function QMLTreeToJS(tree, options) {
 	return {
 		code: _QMLTreeToJSBuilder([tree], args_info, ""),
 		params: args_info.params,
-		args: args_info.args
+		args: args_info.args,
+		build: BuildJSToFunction
 	}
+};
+
+function BuildJSToFunction() {
+	var con_factory = Function(qml.params, "return function(){return " + qml.code + "}");
+	var con = con_factory.apply(null, qml.args);
+	return con
 };
 
 function _QMLTreeToJSBuilder(tree, args_info, param_prefix) {
@@ -95,7 +102,7 @@ QMLTreeToJSBuilder[_TOPLEVEL] = function(node, args_info, param_prefix) {
 		$Map(node[1], function(import_node, i) {
 			return QMLTreeToJSBuilder[_QMLIMPORT](import_node, args_info, param_prefix + i)
 		}).join() +
-		"],function($){" + //$scope
+		"],function($){return " + //$scope
 		QMLTreeToJSBuilder[_QMLELEM](node[2], args_info, param_prefix) +
 		"})"
 };
@@ -118,7 +125,7 @@ QMLTreeToJSBuilder[_QMLELEM] = function(node, args_info, param_prefix) {
 	$Push(args_info.params, param_name);
 	$Push(args_info.args, node);
 
-	return "$.elem('" + node[1] + "'," +
+	return "$." + _QMLELEM + "('" + node[1] + "'," +
 		(node[2] ? ("'" + node[2] + "'") : "null") +
 		",[" +
 		$Map(node[3], function(child_node, i) {
@@ -136,7 +143,7 @@ QMLTreeToJSBuilder[_QMLPROP] = function(node, args_info, param_prefix) {
 	// $Push(args_info.params, param_name);
 	// $Push(args_info.args, node);
 
-	return "$.prop('" + node[1] + "'," +
+	return "$." + _QMLPROP + "('" + node[1] + "'," +
 		QMLTreeToJSBuilder[propValue[0]](propValue, args_info, param_name) +
 		")"
 };
@@ -162,7 +169,7 @@ QMLTreeToJSBuilder[_QMLMETHOD] = function(node, args_info, param_prefix) {
 	return "QMLMETHOD()"
 };
 QMLTreeToJSBuilder[_QMLOBJDEF] = function(node, args_info, param_prefix) {
-	return "$.objdef('" + node[1] + "','" + node[2] + "'," + ItemQMLTreeToJSBuilder(node[3]) + ")"
+	return "$." + _QMLOBJDEF + "('" + node[1] + "','" + node[2] + "'," + ItemQMLTreeToJSBuilder(node[3]) + ")"
 };
 QMLTreeToJSBuilder[_QMLOBJ] = function(node, args_info, param_prefix) {
 	return "QMLOBJ()"
@@ -170,8 +177,8 @@ QMLTreeToJSBuilder[_QMLOBJ] = function(node, args_info, param_prefix) {
 
 function ArrayQMLTreeToJSBuilder(nodes, args_info, param_prefix) {
 	return $Map(nodes, function(child_node, i) {
-		return ItemQMLTreeToJSBuilder(child_node, args_info, param_prefix + i)
-	})/*.join()*/ //join可以不写会隐式调用
+			return ItemQMLTreeToJSBuilder(child_node, args_info, param_prefix + i)
+		}) /*.join()*/ //join可以不写会隐式调用
 };
 
 function ItemQMLTreeToJSBuilder(node, args_info, param_prefix) {

@@ -3,6 +3,8 @@
 /*
  * 更好的压缩率
  */
+var __PROTOTYPE = "prototype";
+
 function $Push(arr, item) {
 	arr[arr.length] = item;
 	return arr
@@ -21,8 +23,19 @@ function $Map(arr, cb) {
 	return res
 }
 
+var _slice = Array[__PROTOTYPE].slice;
+
 function $Slice(arr, start_index, end_index) {
-	return arr.slice(start_index, end_index)
+	return _slice.call(arr, start_index, end_index);
+};
+
+function $Remove(arr, item) {
+	var index = arr.indexOf(item);
+	index !== -1 && arr.splice(i, 1);
+};
+
+function $HasAndGet(obj, key) {
+	return obj.hasOwnProperty(key) && obj[key];
 };
 
 //将字符串反转义,同JSON.stringify(string)
@@ -132,8 +145,15 @@ function QMLTreeToJS(tree, options) {
 	return {
 		code: _QMLTreeToJSBuilder([tree], args_info, ""),
 		params: args_info.params,
-		args: args_info.args
+		args: args_info.args,
+		build: BuildJSToFunction
 	}
+};
+
+function BuildJSToFunction() {
+	var con_factory = Function(qml.params, "return function(){return " + qml.code + "}");
+	var con = con_factory.apply(null, qml.args);
+	return con
 };
 
 function _QMLTreeToJSBuilder(tree, args_info, param_prefix) {
@@ -164,7 +184,7 @@ QMLTreeToJSBuilder[_TOPLEVEL] = function(node, args_info, param_prefix) {
 		$Map(node[1], function(import_node, i) {
 			return QMLTreeToJSBuilder[_QMLIMPORT](import_node, args_info, param_prefix + i)
 		}).join() +
-		"],function($){" + //$scope
+		"],function($){return " + //$scope
 		QMLTreeToJSBuilder[_QMLELEM](node[2], args_info, param_prefix) +
 		"})"
 };
@@ -187,7 +207,7 @@ QMLTreeToJSBuilder[_QMLELEM] = function(node, args_info, param_prefix) {
 	$Push(args_info.params, param_name);
 	$Push(args_info.args, node);
 
-	return "$.elem('" + node[1] + "'," +
+	return "$." + _QMLELEM + "('" + node[1] + "'," +
 		(node[2] ? ("'" + node[2] + "'") : "null") +
 		",[" +
 		$Map(node[3], function(child_node, i) {
@@ -205,7 +225,7 @@ QMLTreeToJSBuilder[_QMLPROP] = function(node, args_info, param_prefix) {
 	// $Push(args_info.params, param_name);
 	// $Push(args_info.args, node);
 
-	return "$.prop('" + node[1] + "'," +
+	return "$." + _QMLPROP + "('" + node[1] + "'," +
 		QMLTreeToJSBuilder[propValue[0]](propValue, args_info, param_name) +
 		")"
 };
@@ -231,7 +251,7 @@ QMLTreeToJSBuilder[_QMLMETHOD] = function(node, args_info, param_prefix) {
 	return "QMLMETHOD()"
 };
 QMLTreeToJSBuilder[_QMLOBJDEF] = function(node, args_info, param_prefix) {
-	return "$.objdef('" + node[1] + "','" + node[2] + "'," + ItemQMLTreeToJSBuilder(node[3]) + ")"
+	return "$." + _QMLOBJDEF + "('" + node[1] + "','" + node[2] + "'," + ItemQMLTreeToJSBuilder(node[3]) + ")"
 };
 QMLTreeToJSBuilder[_QMLOBJ] = function(node, args_info, param_prefix) {
 	return "QMLOBJ()"
@@ -239,8 +259,8 @@ QMLTreeToJSBuilder[_QMLOBJ] = function(node, args_info, param_prefix) {
 
 function ArrayQMLTreeToJSBuilder(nodes, args_info, param_prefix) {
 	return $Map(nodes, function(child_node, i) {
-		return ItemQMLTreeToJSBuilder(child_node, args_info, param_prefix + i)
-	})/*.join()*/ //join可以不写会隐式调用
+			return ItemQMLTreeToJSBuilder(child_node, args_info, param_prefix + i)
+		}) /*.join()*/ //join可以不写会隐式调用
 };
 
 function ItemQMLTreeToJSBuilder(node, args_info, param_prefix) {
@@ -249,6 +269,17 @@ function ItemQMLTreeToJSBuilder(node, args_info, param_prefix) {
 	}
 	return node && QMLTreeToJSBuilder[node[0]](node, args_info, param_prefix)
 };
+function Doc() {
+
+};
+var __DocPrototype = Doc.prototype = {};
+__DocPrototype.createElement = function(nodeName) {
+	return {
+		tagName: nodeName.toUpperCase()
+	}
+};
+var globalDoc = Doc.global = global.document || new Doc;
+
 QMLTreeToJSBuilder[_BLOCK] = function(node, args_info, param_prefix) {
 	/*
 	 * 代码块，存在于function，if-else，while，try等可以包裹代码块的地方
@@ -448,6 +479,269 @@ QMLTreeToJSBuilder[_FUNCTION] = function(node, args_info, param_prefix) {
 		return strStringify(argName)
 	});
 
-	return "$.function(" + functionName + ",[" + argsDefine.join() + "])"
+	return "$.function(" + functionName + ",[" + argsDefine.join() + "," + ArrayQMLTreeToJSBuilder(node[3]) + "])"
+};
+function QMLElem(doc, tagName, namespace) {
+	var self = {};
+	tagName = self.tagName = tagName.toUpperCase();
+	namespace = self.namespace || "";
+	var dom = self.dom = doc.createElement(tagName);
+	var attr = self.attr = QmlPropSet();
+	self.addAttr = function(qmlprop) {
+		$Push(QmlPropSet, qmlprop);
+	};
+	return self;
+};
+function QmlProp(name, value) {
+	var self = {};
+	self[name] = value;
+	return self;
+};
+
+function QmlPropSet() {
+	var res = [];
+	return res;
+};
+function QML() {
+	var self = this;
+	self.deps = null
+	self.runtime = new RunTime;
+	self.events = {};
+	self.STATE = __QMLStates.BeforeLoadDeps;
+};
+global.QML = QML;
+QML.import = function(deps, callback) {
+	var slef = new QML();
+	_emitState(slef, 0);
+	setTimeout(function() {
+		_emitState(slef, 2);
+		_emitState(slef, 3);
+		slef.STATE = 4; //BuildingComponent no emit
+		callback(slef.runtime);
+		_emitState(slef, 5);
+	}, 200);
+	_emitState(slef, 1);
+	return slef
+};
+_emitState = function(self, state) {
+	self.STATE = state;
+	self.emit(__STATEP_REIFX + state);
+};
+var __QMLStates = QML.states = {
+	BeforeLoadDeps: 0,
+	LoadingDeps: 1,
+	LoadedDeps: 2,
+	BeforeBuildComponent: 3,
+	BuildingComponent: 4,
+	BuildedComponent: 5
+};
+var __STATEP_REIFX = "STATE:";
+
+
+var __QMLPrototype = QML.prototype = {};
+__QMLPrototype.appendTo = function(dom) {
+	var self = this;
+	var runtime_root = self.runtime.root;
+	var node = runtime_root && runtime_root.dom;
+	node && dom.appendChild(node);
+	return self;
+};
+__QMLPrototype.on = function(eventName, eventHandle) {
+	var self = this;
+	var events = self.events;
+	$Push(events[eventName] || (events[eventName] = []), eventHandle);
+	return self;
+};
+__QMLPrototype.off = function(eventName, eventHandle) {
+	var self = this;
+	var events = self.events;
+	$Remove(events[eventName] || (events[eventName] = []), eventHandle);
+	return self;
+};
+__QMLPrototype.emit = function(eventName) {
+	var self = this;
+	var eventList = $HasAndGet(self.events, eventName);
+	if (eventList) {
+		var args = arguments.length > 1 && $Slice(arguments, 1);
+		$ForEach(eventList, function(handle) {
+			args ? handle.apply(self, args) : handle.call(this);
+		});
+	}
+	return self;
+};
+__QMLPrototype.onState = function(state, handle) {
+	state = ~~state;
+	var self = this;
+	if (self.STATE >= state) {
+		handle.call(self)
+	} else {
+		self.on(__STATEP_REIFX + state, handle);
+	}
+	return self;
+};
+function RunTime(scope, doc) {
+	this.scope = scope || new Scope();
+	this.doc = doc || globalDoc;
+	this.root = null;
+};
+var __RunTimeProtoType = RunTime.prototype = {}
+__RunTimeProtoType[_BLOCK] = function() {
+
+};
+__RunTimeProtoType[_DEBUGGER] = function() {
+
+};
+__RunTimeProtoType[_DO] = function() {
+
+};
+__RunTimeProtoType[_RETURN] = function() {
+
+};
+__RunTimeProtoType[_SWITCH] = function() {
+
+};
+__RunTimeProtoType[_THROW] = function() {
+
+};
+__RunTimeProtoType[_WHILE] = function() {
+
+};
+__RunTimeProtoType[_WITH] = function() {
+
+};
+__RunTimeProtoType[_LABEL] = function() {
+
+};
+__RunTimeProtoType[_STAT] = function() {
+
+};
+__RunTimeProtoType[_NAME] = function() {
+
+};
+__RunTimeProtoType[_FOR] = function() {
+
+};
+__RunTimeProtoType[_IF] = function() {
+
+};
+__RunTimeProtoType[_TRY] = function() {
+
+};
+__RunTimeProtoType[_VAR] = function() {
+
+};
+__RunTimeProtoType[_CONST] = function() {
+
+};
+__RunTimeProtoType[_NEW] = function() {
+
+};
+__RunTimeProtoType[_REGEXP] = function() {
+
+};
+__RunTimeProtoType[_ARRAY] = function() {
+
+};
+__RunTimeProtoType[_OBJECT] = function() {
+
+};
+__RunTimeProtoType[_DOT] = function() {
+
+};
+__RunTimeProtoType[_SUB] = function() {
+
+};
+__RunTimeProtoType[_CALL] = function() {
+
+};
+__RunTimeProtoType[_BINARY] = function() {
+
+};
+__RunTimeProtoType[_CONDITIONAL] = function() {
+
+};
+__RunTimeProtoType[_ASSIGN] = function() {
+
+};
+__RunTimeProtoType[_SEQ] = function() {
+
+};
+__RunTimeProtoType[_QMLBINDING] = function() {
+
+};
+__RunTimeProtoType[_QMLVALUE] = function() {
+
+};
+__RunTimeProtoType[_QMLALIASDEF] = function() {
+
+};
+__RunTimeProtoType[_QMLPROPDEF] = function() {
+
+};
+__RunTimeProtoType[_QMLDEFAULTPROP] = function() {
+
+};
+__RunTimeProtoType[_QMLSIGNALDEF] = function() {
+
+};
+__RunTimeProtoType[_QMLMETHOD] = function() {
+
+};
+__RunTimeProtoType[_QMLPROP] = function(prop_name, value) {
+	return QmlProp(prop_name, value)
+};
+__RunTimeProtoType["base_" + _QMLELEM] = function(tagName, namespace, args) {
+	var self = this;
+	var node = QMLElem(self.doc, tagName, namespace);
+	$ForEach(args, node.addAttr);
+	return node;
+};
+__RunTimeProtoType[_QMLELEM] = __RunTimeProtoType["root_" + _QMLELEM] = function(tagName, namespace, args) {
+	var self = this;
+	self[_QMLELEM] = self["base_" + _QMLELEM];
+	var res = self[_QMLELEM].apply(this, arguments)
+	self.root = res;
+	return res;
+};
+
+__RunTimeProtoType[_QMLOBJDEF] = function() {
+
+};
+__RunTimeProtoType[_QMLOBJ] = function() {
+
+};
+__RunTimeProtoType[_QMLIMPORT] = function() {
+
+};
+__RunTimeProtoType[_TOPLEVEL] = function() {
+
+};
+__RunTimeProtoType[_NUM] = function() {
+
+};
+__RunTimeProtoType[_STRING] = function() {
+
+};
+__RunTimeProtoType[_FUNCTION] = function() {
+
+};
+__RunTimeProtoType[_UNARY_PREFIX] = function() {
+
+};
+__RunTimeProtoType[_UNARY_POSTFIX] = function() {
+
+};
+function Scope(obj, parent) {
+	this.data = obj;
+	this.parent = parent || globalScope;
+};
+var globalScope = Scope.global = new Scope(global);
+Scope.prototype = {
+	get: function(key) {
+		return this[key]
+	},
+	set: function(key, value) {
+		return this[key] = value
+	}
 };
 })(typeof global != 'undefined' ? global : typeof window != 'undefined' ? window : this);
